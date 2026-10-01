@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() => runApp(const DarlingCloudApp());
 
@@ -127,24 +129,21 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> {
-  late final WebViewController _controller;
+  InAppWebViewController? _webViewController;
   bool _loading = true;
   String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() { _loading = true; _error = null; }),
-        onPageFinished: (_) => setState(() => _loading = false),
-        onWebResourceError: (e) => setState(() {
-          _loading = false;
-          _error = '网页加载失败：${e.description}';
-        }),
-      ))
-      ..loadRequest(Uri.parse(widget.url));
+  Future<String> _getDownloadPath() async {
+    Directory? dir;
+    if (Platform.isAndroid) {
+      dir = await getExternalStorageDirectory();
+      dir = Directory('${dir!.path}/Download');
+    } else {
+      dir = await getDownloadsDirectory();
+    }
+    dir ??= await getApplicationDocumentsDirectory();
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir.path;
   }
 
   @override
@@ -155,7 +154,7 @@ class _WebViewPageState extends State<WebViewPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => _controller.reload(),
+            onPressed: () => _webViewController?.reload(),
           ),
           IconButton(
             icon: const Icon(Icons.open_in_browser),
@@ -180,7 +179,45 @@ class _WebViewPageState extends State<WebViewPage> {
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
+          InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialSettings: InAppWebViewSettings(
+              javaScriptEnabled: true,
+              allowsInlineMediaPlayback: true,
+              useOnDownloadStart: true,
+              clearCache: false,
+              cacheEnabled: true,
+              allowsLinkPreview: false,
+              supportZoom: false,
+            ),
+            onWebViewCreated: (controller) {
+              _webViewController = controller;
+            },
+            onLoadStart: (controller, url) => setState(() {
+              _loading = true;
+              _error = null;
+            }),
+            onLoadStop: (controller, url) => setState(() => _loading = false),
+            onReceivedError: (controller, request, error) {
+              if (request.isForMainFrame) {
+                setState(() {
+                  _loading = false;
+                  _error = '网页加载失败：${error.description}';
+                });
+              }
+            },
+            onDownloadStartRequest: (controller, request) async {
+              final path = await _getDownloadPath();
+              final fileName = request.suggestedFilename ??
+                  'download_${DateTime.now().millisecondsSinceEpoch}';
+              final fullPath = '$path/$fileName';
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('下载中：$fileName')),
+              );
+              // Use system browser to download with proper handling
+              await launchUrl(request.url, mode: LaunchMode.externalApplication);
+            },
+          ),
           if (_loading)
             const Center(child: CircularProgressIndicator()),
           if (_error != null)
