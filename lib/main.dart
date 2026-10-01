@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:path_provider/path_provider.dart';
 
 void main() => runApp(const DarlingCloudApp());
 
@@ -133,19 +132,6 @@ class _WebViewPageState extends State<WebViewPage> {
   bool _loading = true;
   String? _error;
 
-  Future<String> _getDownloadPath() async {
-    Directory? dir;
-    if (Platform.isAndroid) {
-      dir = await getExternalStorageDirectory();
-      dir = Directory('${dir!.path}/Download');
-    } else {
-      dir = await getDownloadsDirectory();
-    }
-    dir ??= await getApplicationDocumentsDirectory();
-    if (!await dir.exists()) await dir.create(recursive: true);
-    return dir.path;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -180,15 +166,16 @@ class _WebViewPageState extends State<WebViewPage> {
       body: Stack(
         children: [
           InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-            initialSettings: InAppWebViewSettings(
-              javaScriptEnabled: true,
-              allowsInlineMediaPlayback: true,
-              useOnDownloadStart: true,
-              clearCache: false,
-              cacheEnabled: true,
-              allowsLinkPreview: false,
-              supportZoom: false,
+            initialUrlRequest: URLRequest(url: Uri.parse(widget.url)),
+            initialOptions: InAppWebViewGroupOptions(
+              crossPlatform: InAppWebViewOptions(
+                javaScriptEnabled: true,
+                useOnDownloadStart: true,
+                clearCache: false,
+              ),
+              android: AndroidInAppWebViewOptions(
+                useHybridComposition: true,
+              ),
             ),
             onWebViewCreated: (controller) {
               _webViewController = controller;
@@ -206,16 +193,11 @@ class _WebViewPageState extends State<WebViewPage> {
                 });
               }
             },
-            onDownloadStartRequest: (controller, request) async {
-              final path = await _getDownloadPath();
-              final fileName = request.suggestedFilename ??
-                  'download_${DateTime.now().millisecondsSinceEpoch}';
-              final fullPath = '$path/$fileName';
+            onDownloadStart: (controller, url) async {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('下载中：$fileName')),
+                const SnackBar(content: Text('正在下载...')),
               );
-              // Use system browser to download with proper handling
-              await launchUrl(request.url, mode: LaunchMode.externalApplication);
+              await launchUrl(url, mode: LaunchMode.externalApplication);
             },
           ),
           if (_loading)
