@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const DarlingCloudApp());
@@ -145,17 +144,7 @@ class _WebViewPageState extends State<WebViewPage> {
           _error = '网页加载失败：${e.description}';
         }),
       ))
-      ..setOnShowFileSelectorCallback(_onShowFileSelector)
       ..loadRequest(Uri.parse(widget.url));
-  }
-
-  Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: params.acceptMultiple,
-      type: FileType.any,
-    );
-    if (result == null) return [];
-    return result.files.map((f) => f.path!).where((p) => p.isNotEmpty).toList();
   }
 
   @override
@@ -167,6 +156,12 @@ class _WebViewPageState extends State<WebViewPage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => _controller.reload(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.open_in_browser),
+            tooltip: '在浏览器中打开',
+            onPressed: () => launchUrl(Uri.parse(widget.url),
+                mode: LaunchMode.externalApplication),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
