@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -128,9 +127,25 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> {
-  InAppWebViewController? _webViewController;
+  late final WebViewController _controller;
   bool _loading = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) => setState(() { _loading = true; _error = null; }),
+        onPageFinished: (_) => setState(() => _loading = false),
+        onWebResourceError: (e) => setState(() {
+          _loading = false;
+          _error = '网页加载失败：${e.description}';
+        }),
+      ))
+      ..loadRequest(Uri.parse(widget.url));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,11 +155,11 @@ class _WebViewPageState extends State<WebViewPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => _webViewController?.reload(),
+            onPressed: () => _controller.reload(),
           ),
           IconButton(
             icon: const Icon(Icons.open_in_browser),
-            tooltip: '在浏览器中打开',
+            tooltip: '在浏览器中打开（上传/下载）',
             onPressed: () => launchUrl(Uri.parse(widget.url),
                 mode: LaunchMode.externalApplication),
           ),
@@ -165,33 +180,7 @@ class _WebViewPageState extends State<WebViewPage> {
       ),
       body: Stack(
         children: [
-          InAppWebView(
-            initialUrlRequest: URLRequest(url: Uri.parse(widget.url)),
-            initialOptions: InAppWebViewGroupOptions(
-              crossPlatform: InAppWebViewOptions(
-                javaScriptEnabled: true,
-                useOnDownloadStart: true,
-                clearCache: false,
-              ),
-              android: AndroidInAppWebViewOptions(
-                useHybridComposition: true,
-              ),
-            ),
-            onWebViewCreated: (controller) {
-              _webViewController = controller;
-            },
-            onLoadStart: (controller, url) => setState(() {
-              _loading = true;
-              _error = null;
-            }),
-            onLoadStop: (controller, url) => setState(() => _loading = false),
-            onDownloadStart: (controller, url) async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('正在下载...')),
-              );
-              await launchUrl(url, mode: LaunchMode.externalApplication);
-            },
-          ),
+          WebViewWidget(controller: _controller),
           if (_loading)
             const Center(child: CircularProgressIndicator()),
           if (_error != null)
