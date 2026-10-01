@@ -176,12 +176,10 @@ class _WebViewPageState extends State<WebViewPage> {
             }),
             onLoadStop: (controller, url) => setState(() => _loading = false),
             onReceivedError: (controller, request, error) {
-              if (request.isForMainFrame) {
-                setState(() {
-                  _loading = false;
-                  _error = '网页加载失败：${error.description}';
-                });
-              }
+              setState(() {
+                _loading = false;
+                _error = '网页加载失败：${error.description}';
+              });
             },
             onDownloadStartRequest: (controller, request) async {
               await launchUrl(request.url, mode: LaunchMode.externalApplication);
