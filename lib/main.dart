@@ -69,7 +69,7 @@ class SetupPage extends StatefulWidget {
 }
 
 class _SetupPageState extends State<SetupPage> {
-  final _controller = TextEditingController(text: 'http://');
+  final _controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +88,7 @@ class _SetupPageState extends State<SetupPage> {
               controller: _controller,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: 'http://23.147.68.16:17817',
+                hintText: '',
                 labelText: '服务端地址',
               ),
             ),
@@ -128,6 +128,7 @@ class WebViewPage extends StatefulWidget {
 class _WebViewPageState extends State<WebViewPage> {
   late final WebViewController _controller;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -135,8 +136,12 @@ class _WebViewPageState extends State<WebViewPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _loading = true),
+        onPageStarted: (_) => setState(() { _loading = true; _error = null; }),
         onPageFinished: (_) => setState(() => _loading = false),
+        onWebResourceError: (e) => setState(() {
+          _loading = false;
+          _error = '网页加载失败：${e.description}';
+        }),
       ))
       ..loadRequest(Uri.parse(widget.url));
   }
@@ -171,6 +176,20 @@ class _WebViewPageState extends State<WebViewPage> {
           WebViewWidget(controller: _controller),
           if (_loading)
             const Center(child: CircularProgressIndicator()),
+          if (_error != null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(_error!, textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
