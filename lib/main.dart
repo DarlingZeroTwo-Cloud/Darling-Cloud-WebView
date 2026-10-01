@@ -175,12 +175,6 @@ class _WebViewPageState extends State<WebViewPage> {
               _error = null;
             }),
             onLoadStop: (controller, url) => setState(() => _loading = false),
-            onReceivedError: (controller, request, error) {
-              setState(() {
-                _loading = false;
-                _error = '网页加载失败：${error.description}';
-              });
-            },
             onDownloadStartRequest: (controller, request) async {
               await launchUrl(request.url, mode: LaunchMode.externalApplication);
             },
