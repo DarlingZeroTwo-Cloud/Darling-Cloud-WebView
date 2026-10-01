@@ -185,14 +185,6 @@ class _WebViewPageState extends State<WebViewPage> {
               _error = null;
             }),
             onLoadStop: (controller, url) => setState(() => _loading = false),
-            onWebViewReceivedError: (controller, request, error) {
-              if (request.isForMainFrame) {
-                setState(() {
-                  _loading = false;
-                  _error = '网页加载失败：${error.description}';
-                });
-              }
-            },
             onDownloadStart: (controller, url) async {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('正在下载...')),
