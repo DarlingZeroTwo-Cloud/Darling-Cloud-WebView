@@ -185,7 +185,7 @@ class _WebViewPageState extends State<WebViewPage> {
               _error = null;
             }),
             onLoadStop: (controller, url) => setState(() => _loading = false),
-            onReceivedError: (controller, request, error) {
+            onWebViewReceivedError: (controller, request, error) {
               if (request.isForMainFrame) {
                 setState(() {
                   _loading = false;
