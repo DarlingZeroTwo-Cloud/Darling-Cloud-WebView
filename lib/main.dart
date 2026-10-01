@@ -1,8 +1,20 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-void main() => runApp(const DarlingCloudApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FlutterDownloader.initialize(debug: false);
+  runApp(const DarlingCloudApp());
+}
 
 class DarlingCloudApp extends StatelessWidget {
   const DarlingCloudApp({super.key});
@@ -135,6 +147,7 @@ class _WebViewPageState extends State<WebViewPage> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) => setState(() { _loading = true; _error = null; }),
         onPageFinished: (_) => setState(() => _loading = false),
@@ -142,8 +155,55 @@ class _WebViewPageState extends State<WebViewPage> {
           _loading = false;
           _error = '网页加载失败：${e.description}';
         }),
+        onNavigationRequest: (req) {
+          // 拦截非 http/https 的链接，用外部浏览器打开
+          if (req.url.startsWith('http://') || req.url.startsWith('https://')) {
+            return NavigationDecision.navigate;
+          }
+          launchUrl(Uri.parse(req.url));
+          return NavigationDecision.prevent;
+        },
       ))
+      ..setOnShowFileSelectorCallback(_onShowFileSelector)
       ..loadRequest(Uri.parse(widget.url));
+
+    // 下载监听（Android）
+    if (Platform.isAndroid) {
+      _enableDownloadListener();
+    }
+  }
+
+  void _enableDownloadListener() {
+    _controller.setDownloadListener((DownloadRequest request) async {
+      final status = await Permission.storage.request();
+      if (!status.isGranted) return;
+
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return;
+
+      final fileName = request.url.split('/').last.split('?').first;
+      await FlutterDownloader.enqueue(
+        url: request.url,
+        savedDir: dir.path,
+        fileName: fileName,
+        showNotification: true,
+        openFileFromNotification: true,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('开始下载：$fileName')),
+        );
+      }
+    });
+  }
+
+  Future<List<String>> _onShowFileSelector(FileSelectorParams params) async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: params.acceptMultiple,
+      type: FileType.any,
+    );
+    if (result == null) return [];
+    return result.files.map((f) => f.path!).where((p) => p.isNotEmpty).toList();
   }
 
   @override
