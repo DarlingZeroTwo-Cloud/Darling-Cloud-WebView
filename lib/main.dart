@@ -166,7 +166,6 @@ class _WebViewPageState extends State<WebViewPage> {
               clearCache: false,
               cacheEnabled: true,
               allowsInlineMediaPlayback: true,
-              supportZoom: false,
             ),
             onWebViewCreated: (controller) {
               _webViewController = controller;
