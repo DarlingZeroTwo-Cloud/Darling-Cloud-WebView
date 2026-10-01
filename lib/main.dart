@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -127,25 +127,9 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> {
-  late final WebViewController _controller;
+  InAppWebViewController? _webViewController;
   bool _loading = true;
   String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() { _loading = true; _error = null; }),
-        onPageFinished: (_) => setState(() => _loading = false),
-        onWebResourceError: (e) => setState(() {
-          _loading = false;
-          _error = '网页加载失败：${e.description}';
-        }),
-      ))
-      ..loadRequest(Uri.parse(widget.url));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,13 +139,7 @@ class _WebViewPageState extends State<WebViewPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => _controller.reload(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.open_in_browser),
-            tooltip: '在浏览器中打开（上传/下载）',
-            onPressed: () => launchUrl(Uri.parse(widget.url),
-                mode: LaunchMode.externalApplication),
+            onPressed: () => _webViewController?.reload(),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -180,7 +158,36 @@ class _WebViewPageState extends State<WebViewPage> {
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
+          InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialSettings: InAppWebViewSettings(
+              javaScriptEnabled: true,
+              useOnDownloadStart: true,
+              clearCache: false,
+              cacheEnabled: true,
+              allowsInlineMediaPlayback: true,
+              supportZoom: false,
+            ),
+            onWebViewCreated: (controller) {
+              _webViewController = controller;
+            },
+            onLoadStart: (controller, url) => setState(() {
+              _loading = true;
+              _error = null;
+            }),
+            onLoadStop: (controller, url) => setState(() => _loading = false),
+            onReceivedError: (controller, request, error) {
+              if (request.isForMainFrame) {
+                setState(() {
+                  _loading = false;
+                  _error = '网页加载失败：${error.description}';
+                });
+              }
+            },
+            onDownloadStartRequest: (controller, request) async {
+              await launchUrl(request.url, mode: LaunchMode.externalApplication);
+            },
+          ),
           if (_loading)
             const Center(child: CircularProgressIndicator()),
           if (_error != null)
